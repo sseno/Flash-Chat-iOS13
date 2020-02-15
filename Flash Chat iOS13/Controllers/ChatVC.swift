@@ -8,6 +8,7 @@
 
 import UIKit
 import FirebaseAuth
+import FirebaseFirestore
 import LBTATools
 
 class ChatVC: UIViewController {
@@ -17,33 +18,22 @@ class ChatVC: UIViewController {
     let commentTf = IndentedTextField(placeholder: "Write a message...", padding: 10, cornerRadius: 10, backgroundColor: .white)
     let sendButton = UIButton(image: UIImage(systemName: "paperplane.fill")!, target: self, action: #selector(didTapSend(_:)))
     
-    var messages: [Message] = [
-        Message(sender: "pesanmerpati@gmail.com", body: "Hey!"),
-        Message(sender: "pm@gmail.com", body: "Message body Message body Message body Message body Message body Message body Message body Message body"),
-        Message(sender: "pesanmerpati@gmail.com", body: "What's up?"),
-        Message(sender: "pesanmerpati@gmail.com", body: "Hey!"),
-        Message(sender: "pm@gmail.com", body: "Message body Message body Message body Message body Message body Message body Message body Message body"),
-        Message(sender: "pesanmerpati@gmail.com", body: "What's up?"),
-        Message(sender: "pesanmerpati@gmail.com", body: "Hey!"),
-        Message(sender: "pm@gmail.com", body: "Message body Message body Message body Message body Message body Message body Message body Message body"),
-        Message(sender: "pesanmerpati@gmail.com", body: "What's up?"),
-        Message(sender: "pesanmerpati@gmail.com", body: "Hey!"),
-        Message(sender: "pm@gmail.com", body: "Message body Message body Message body Message body Message body Message body Message body Message body"),
-        Message(sender: "pesanmerpati@gmail.com", body: "What's up?")
-    ]
+    let db = Firestore.firestore()
+    
+    var messages: [Message] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor(named: K.BrandColors.purple)
         setupNavBar()
         setupTableView()
+        loadMessages()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         self.navigationController?.setNavigationBarHidden(false, animated: false)
     }
-    
     
     private func setupNavBar() {
         self.navigationItem.hidesBackButton = true
@@ -75,13 +65,43 @@ class ChatVC: UIViewController {
         commentInputView.heightAnchor.constraint(equalToConstant: 50).isActive = true
         
         sendButton.tintColor = .white
-        commentInputView.hstack(commentTf, sendButton, spacing: 20)
+        commentInputView.hstack(commentTf, sendButton.withWidth(30), spacing: 20)
             .withMargins(.init(top: 8, left: 20, bottom: 0, right: 20))
     }
     
+    private func loadMessages() {
+        db.collection(K.FStore.collectionName).getDocuments { (querySnapshot, error) in
+            if let err = error {
+                print("There was an issue retrieveing data from Firestore. \(err)")
+            } else {
+                if let snapshotDocuments = querySnapshot?.documents {
+                    for doc in snapshotDocuments {
+                        let data = doc.data()
+                        if let sender = data[K.FStore.senderField] as? String, let message = data[K.FStore.bodyField] as? String {
+                            let newMessage = Message(sender: sender, body: message)
+                            self.messages.append(newMessage)
+                            
+                            DispatchQueue.main.async {
+                                self.tableView.reloadData()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     @objc fileprivate func didTapSend(_ sender: UIButton) {
-        let message = commentTf.text
-        //let sender =
+        if let message = commentTf.text, let sender = Auth.auth().currentUser?.email {
+            db.collection(K.FStore.collectionName).addDocument(data: [K.FStore.senderField: sender,
+                                                                      K.FStore.bodyField: message]) { (error) in
+                                                                        if let err = error {
+                                                                            print("There was an issue saving data to Firestore \(err.localizedDescription)")
+                                                                        } else {
+                                                                            print("Successfully saved data.")
+                                                                        }
+            }
+        }
     }
     
     @objc fileprivate func didTapLogout(_ sender: UIBarButtonItem) {
