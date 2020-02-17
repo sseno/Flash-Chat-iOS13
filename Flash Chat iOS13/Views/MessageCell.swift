@@ -14,6 +14,8 @@ class MessageCell: UITableViewCell {
     let messageBubble = UIView(backgroundColor: UIColor(named: K.BrandColors.purple)!)
     let messageLabel = UILabel(text: "Message body", font: .systemFont(ofSize: 17), textColor: UIColor(named: K.BrandColors.lightPurple)!, numberOfLines: 0)
     let img = UIImageView(image: UIImage(named: "MeAvatar"))
+    let senderImg = UIImageView(image: UIImage(named: "YouAvatar"))
+    let senderName = UILabel(text: "Username", font: .boldSystemFont(ofSize: 17), textColor: .black, numberOfLines: 0)
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -27,7 +29,8 @@ class MessageCell: UITableViewCell {
     private func setupViews() {
         contentView.stack(containerView)
         
-        containerView.hstack(messageBubble,
+        containerView.hstack(senderImg.withSize(.init(width: 40, height: 40)),
+                             messageBubble,
                              img.withSize(.init(width: 40, height: 40)),
                              spacing: 20,
                              alignment: .top)

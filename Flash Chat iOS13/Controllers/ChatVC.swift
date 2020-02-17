@@ -36,9 +36,15 @@ class ChatVC: UIViewController {
     }
     
     private func setupNavBar() {
+        self.navigationController?.navigationBar.barTintColor = UIColor(named: K.BrandColors.blue)
+        self.navigationController?.navigationBar.titleTextAttributes = [
+            NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 25),
+            NSAttributedString.Key.foregroundColor: UIColor.white.cgColor]
         self.navigationItem.hidesBackButton = true
         self.title = K.appName
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Log Out", style: .done, target: self, action: #selector(didTapLogout(_:)))
+        let rightBarButton = UIBarButtonItem(title: "Log Out", style: .done, target: self, action: #selector(didTapLogout(_:)))
+        rightBarButton.tintColor = .white
+        self.navigationItem.rightBarButtonItem = rightBarButton
     }
     
     private func setupTableView() {
@@ -66,11 +72,14 @@ class ChatVC: UIViewController {
         
         sendButton.tintColor = .white
         commentInputView.hstack(commentTf, sendButton.withWidth(30), spacing: 20)
-            .withMargins(.init(top: 8, left: 20, bottom: 0, right: 20))
+            .withMargins(.init(top: 8, left: 20, bottom: 8, right: 20))
     }
     
     private func loadMessages() {
-        db.collection(K.FStore.collectionName).getDocuments { (querySnapshot, error) in
+        db.collection(K.FStore.collectionName)
+            .order(by: K.FStore.dateField)
+            .addSnapshotListener { (querySnapshot, error) in
+            self.messages.removeAll()
             if let err = error {
                 print("There was an issue retrieveing data from Firestore. \(err)")
             } else {
@@ -83,6 +92,8 @@ class ChatVC: UIViewController {
                             
                             DispatchQueue.main.async {
                                 self.tableView.reloadData()
+                                let indexPath = IndexPath(row: self.messages.count - 1, section: 0)
+                                self.tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
                             }
                         }
                     }
@@ -93,13 +104,18 @@ class ChatVC: UIViewController {
     
     @objc fileprivate func didTapSend(_ sender: UIButton) {
         if let message = commentTf.text, let sender = Auth.auth().currentUser?.email {
-            db.collection(K.FStore.collectionName).addDocument(data: [K.FStore.senderField: sender,
-                                                                      K.FStore.bodyField: message]) { (error) in
-                                                                        if let err = error {
-                                                                            print("There was an issue saving data to Firestore \(err.localizedDescription)")
-                                                                        } else {
-                                                                            print("Successfully saved data.")
-                                                                        }
+            db.collection(K.FStore.collectionName).addDocument(data: [
+                K.FStore.senderField: sender,
+                K.FStore.bodyField: message,
+                K.FStore.dateField: Date().timeIntervalSince1970]) { (error) in
+                    if let err = error {
+                        print("There was an issue saving data to Firestore \(err.localizedDescription)")
+                    } else {
+                        print("Successfully saved data.")
+                        DispatchQueue.main.async {
+                            self.commentTf.text = ""
+                        }
+                    }
             }
         }
     }
@@ -133,10 +149,24 @@ extension ChatVC: UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        //tableView.separatorStyle = .none
+        tableView.separatorStyle = .none
+        let message = messages[indexPath.row]
+        
         let cell = tableView.dequeueReusableCell(withIdentifier: K.CellIdentifier.messageCell, for: indexPath) as! MessageCell
-        //cell.selectionStyle = .none
-        cell.messageLabel.text = messages[indexPath.row].body
+        cell.selectionStyle = .none
+        cell.messageLabel.text = message.body
+        
+        if Auth.auth().currentUser?.email == message.sender {
+            cell.senderImg.isHidden = true
+            cell.img.isHidden = false
+            cell.messageBubble.backgroundColor = UIColor(named: K.BrandColors.lightPurple)
+            cell.messageLabel.textColor = UIColor(named: K.BrandColors.purple)
+        } else {
+            cell.img.isHidden = true
+            cell.senderImg.isHidden = false
+            cell.messageBubble.backgroundColor = UIColor(named: K.BrandColors.purple)
+            cell.messageLabel.textColor = UIColor(named: K.BrandColors.lightPurple)
+        }
         return cell
     }
 }
